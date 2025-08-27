@@ -168,45 +168,51 @@ where
         }
     }
 
-
     // --------------------------------------------------
-    /// Find the first and last positions of a query string in a suffix array,
+    /// Find the first and last positions of a query char in a suffix array,
     /// given a range of viable positions.
     /// Returns a `BisectResult`
     ///
     /// Args:
     /// * `query_num`: ordinal number of the query
-    /// * `query`: a string to search for
+    /// * `query`: a char to search for
     /// * `low`: the lowest position at which the query may occur
     /// * `high`: the highest position at which the query may occur
+    /// * `lcp`: the lcp of the range of suffix positions low..high.
     pub fn bisect(
         &mut self,
         query_num: usize,
-        query: &str,
+        qry: u8,
+        lcp: usize,
         low: usize,
         high: usize,
     ) -> Result<BisectResult> {
-        let qry = query.as_bytes();
-        if let Some(start) = self.suffix_search_first(qry, low, high, 0, 0) {
+        let query = qry as char;
+        // println!("bisect:\n-qry {}-lcp {}-low {}-high {}", qry, lcp, low, high);
+        if let Some(start) = self.bisect_char_first(qry, lcp, low, high) {
             // something was found
             let end = self
-                .suffix_search_last(qry, start, high, high + 1, 0, 0)
+                .bisect_char_last(qry, lcp, start, high, high + 1)
                 .unwrap_or(start);
+        //     println!("something was found {}..{}", start, end);
             Ok(BisectResult {
                 query_num: query_num,
-                query: query.to_string(),
+                query: query,
                 count: end - start + 1,
                 first_position: start,
                 last_position: end,
+                lcp: lcp + 1,
             })
         } else {
             // nothing was found
+        //     println!("nothing was found");
             Ok(BisectResult {
                 query_num: query_num,
-                query: query.to_string(),
+                query: query,
                 count: 0,
                 first_position: 0,
                 last_position: 0,
+                lcp: 0,
             })
         }
     }
@@ -283,7 +289,7 @@ where
             None
         }
     }
-
+    
     // --------------------------------------------------
     /// Compare a query string to a suffix.
     /// When the suffix array was sorted using a seed mask, only
@@ -390,6 +396,137 @@ where
         };
 
         Comparison { lcp, cmp }
+    }
+
+    // --------------------------------------------------
+    fn bisect_char_first(
+        &mut self,
+        qry: u8,
+        lcp: usize,
+        low: usize,
+        high: usize,
+    ) -> Option<usize> {
+        // println!("bisect_char_first\n-qry {}-lcp {}-low {}-high {}", qry, lcp, low, high);
+        if high >= low {
+            let mid = low + ((high - low) / 2);
+            let mid_val = self.get_suffix(mid)?.to_usize();
+            let mid_cmp = self.compare_char(qry, mid_val, lcp);
+
+            let mid_minus_one = if mid > 0 {
+                self.get_suffix(mid - 1)?.to_usize()
+            } else {
+                mid_val
+            };
+
+            if mid_cmp.cmp == Ordering::Equal
+                && (mid == 0
+                    || self.compare_char(qry, mid_minus_one, lcp).cmp == Ordering::Greater)
+            {
+        //         println!("\tfirst is done: mid {mid}");
+                Some(mid)
+            } else if mid_cmp.cmp == Ordering::Greater {
+                self.bisect_char_first(qry, lcp, mid + 1, high)
+            } else {
+                // Ordering::Less
+                self.bisect_char_first(qry, lcp, low, mid - 1)
+            }
+        } else {
+        //     println!("\tfirst is done: no match");
+            None
+        }
+    }
+
+    // --------------------------------------------------
+    fn bisect_char_last(
+        &mut self,
+        qry: u8,
+        lcp: usize,
+        low: usize,
+        high: usize,
+        n: usize,
+    ) -> Option<usize> {
+        // println!("bisect_char_last\n-qry {}-lcp {}-low {}-high {}-n {}", qry, lcp, low, high, n);
+        if high >= low {
+            let mid = low + ((high - low) / 2);
+            let mid_val = self.get_suffix(mid)?.to_usize();
+            let mid_cmp = self.compare_char(qry, mid_val, lcp);
+
+            let mid_plus_one = if mid < n - 1 {
+                self.get_suffix(mid + 1)?.to_usize()
+            } else {
+                mid_val
+            };
+
+            if mid_cmp.cmp == Ordering::Equal
+                && (mid == n - 1
+                    || self.compare_char(qry, mid_plus_one, lcp).cmp == Ordering::Less)
+            {
+        //         println!("\tlast is done: mid {}", mid);
+                Some(mid)
+            } else if mid_cmp.cmp == Ordering::Less {
+                self.bisect_char_last(qry, lcp, low, mid - 1, n)
+            } else {
+                self.bisect_char_last(qry, lcp, mid + 1, high, n)
+            }
+        } else {
+        //     println!("\tlast is done: no match");
+            None
+        }
+    }
+
+    // --------------------------------------------------
+    /// Compare a query character to a suffix character at a given location.
+    ///
+    /// This function is a mess! It's a prototype of a prototype...
+    /// 
+    /// Args:
+    /// * `query`: char to search for
+    /// * `suffix_pos`: suffix position
+    /// * `loc`: character location within the suffix.
+    fn compare_char(&mut self, query: u8, suffix_pos: usize, loc: usize) -> Comparison {
+        let max_query_len = match &self.sort_type {
+            SuffixSortType::MaxQueryLen(mql) => {
+                // The "MaxQueryLen(mql)" refers to how the suffix array
+                // was built, but there may be a runtime value in self.max_query_len.
+                // If both are present, take the lowest.
+                let max_query_len: usize = if mql > &0 && self.max_query_len.is_some() {
+                    min(*mql, self.max_query_len.unwrap_or(0))
+                } else if let Some(val) = self.max_query_len {
+                    val
+                } else {
+                    *mql
+                };
+                max_query_len
+            }
+            SuffixSortType::Mask(_seed_mask) => {
+                // Not yet supported. TODO: implement this case in a way that doesn't suck.
+                0
+            }
+        };
+        // println!("compare_char\n-query {}-pos {}-loc {}", query, suffix_pos, loc);
+        // println!("-text {:?}", &self.get_text(suffix_pos + loc));
+        let cmp = if (max_query_len > 0) && (loc >= max_query_len) {
+            // We've seen enough
+            Ordering::Equal
+        } else {
+            // Get the next chars
+            let full_offset = find_lcp_full_offset(loc, self.sort_type);
+            match (
+                Some(query),
+                &self.get_text(suffix_pos + full_offset),
+            ) {
+                // Entire query matched
+                (None, _) => Ordering::Equal,
+
+                // Compare next char
+                 (Some(a), Some(b)) => a.cmp(b),
+
+                // Panic at the disco
+                 _ => unreachable!(),
+            }
+        };
+        
+        Comparison { lcp: loc, cmp }
     }
 
     // --------------------------------------------------

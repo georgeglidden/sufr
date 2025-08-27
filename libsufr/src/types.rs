@@ -345,11 +345,11 @@ impl FromUsize<u64> for u64 {
 }
 
 // --------------------------------------------------
-/// Options for bisecting the index ranges of occurrences of query suffixes
+/// Options for restricting a range of suffix positions to a subrange defined by the presence of a query char at a particular index.
 #[derive(Debug, Clone)]
 pub struct BisectOptions {
-    /// Vector of query strings
-    pub queries: Vec<String>,
+    /// Vector of query characters.
+    pub queries: Vec<char>,
 
     /// Maximum query length for search
     pub max_query_len: Option<usize>,
@@ -358,22 +358,21 @@ pub struct BisectOptions {
     /// When `false`, the suffix array will be read from disk.
     pub low_memory: bool,
 
-    /// Optional, the bisect result for a query that is the common prefix of queries.
-    /// If passed, search for query ranges will be restricted to the range defined by prefix_result.
+    /// Optional, the bisect result for a query that is the common prefix of queries. If passed, search for query ranges will be restricted to the range defined by prefix_result and the lcp will be incremented from that of the prefix result. Otherwise, the default range will be the entire suffix array, and accordingly the lcp initializes to 0.
     pub prefix_result: Option<BisectResult>,
 }
 
 // --------------------------------------------------
-/// A struct representing the index range of occurrences of a suffix
+/// A struct representing the results of bisecting a suffix position interval by a query character.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BisectResult {
     /// The ordinal position of the original query
     pub query_num: usize,
 
-    /// The query string
-    pub query: String,
+    /// The query character
+    pub query: char,
 
-    /// The width of the interval
+    /// The combinatoric size of the interval (i.e.: last - first + 1)
     pub count: usize,
 
     /// The first index of a suffix matching the query
@@ -381,6 +380,9 @@ pub struct BisectResult {
 
     /// The last index of a suffix matching the query
     pub last_position: usize,
+
+    /// The lcp of the interval of suffix positions.
+    pub lcp: usize,
 }
 
 // --------------------------------------------------

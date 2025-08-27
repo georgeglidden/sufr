@@ -157,40 +157,57 @@ impl SuffixArray {
     /// use libsufr::{types::{BisectOptions, BisectResult}, suffix_array::SuffixArray};
     /// 
     /// fn main() -> Result<()> {
-    ///     let mut suffix_array = SuffixArray::read("../data/inputs/1.sufr", false)?;
-    ///     let opts_without_prefix = BisectOptions {
-    ///         queries: vec!["AC".to_string(), "CG".to_string()],
+    ///     let mut sufr = SuffixArray::read("../data/inputs/3.sufr", false)?;
+    ///     
+    ///     // 1. without prefix result; should search the whole array for suffixes beginning with A.
+    ///     let opt_sans_pfx = BisectOptions {
+    ///         queries: vec!['A'],
     ///         max_query_len: None,
     ///         low_memory: false,
-    ///         prefix_result: None,
+    ///         prefix_result: None
     ///     };
-    ///     let result_without_prefix = suffix_array.bisect(opts_without_prefix)?;
+    ///     
+    ///     let res_sans_pfx = sufr.bisect(opt_sans_pfx)?;
+    ///     println!("{:?}", res_sans_pfx);
     ///     assert_eq!(
-    ///         result_without_prefix,
-    ///         vec![
-    ///             BisectResult { query_num: 0, query: "AC".to_string(), count: 2, first_position: 1, last_position: 2 }, 
-    ///             BisectResult { query_num: 1, query: "CG".to_string(), count: 2, first_position: 3, last_position: 4 }]
+    ///         res_sans_pfx,
+    ///         vec![BisectResult { query_num: 0, query: 'A', count: 27, first_position: 1, last_position: 27, lcp: 1 }]
     ///     );
-    ///     let prefix_opts = BisectOptions {
-    ///         queries: vec!["A".to_string()],
+    ///     
+    ///     // 1. with prefix; recursively, we are searching for suffixes AC and AT.
+    ///     let opt_with_pfx = BisectOptions {
+    ///         queries: vec!['C','T'],
     ///         max_query_len: None,
     ///         low_memory: false,
-    ///         prefix_result: None,
+    ///         prefix_result: Some(res_sans_pfx[0].clone()),
     ///     };
-    ///     let prefix_result = suffix_array.bisect(prefix_opts)?[0].clone();
-    ///     let opts_with_prefix = BisectOptions {
-    ///         queries: vec!["AC".to_string(), "CG".to_string()],
-    ///         max_query_len: None,
-    ///         low_memory: false,
-    ///         prefix_result: Some(prefix_result),
-    ///     };
-    ///     let result_with_prefix = suffix_array.bisect(opts_with_prefix)?;
+    ///     
+    ///     let res_with_pfx = sufr.bisect(opt_with_pfx)?;
+    ///     println!("{:?}", res_with_pfx);
+    ///     
     ///     assert_eq!(
-    ///         result_with_prefix,
-    ///         vec![
-    ///             BisectResult { query_num: 0, query: "AC".to_string(), count: 2, first_position: 1, last_position: 2 }, 
-    ///             BisectResult { query_num: 1, query: "CG".to_string(), count: 0, first_position: 0, last_position: 0 }]
+    ///         res_with_pfx,
+    ///         vec![BisectResult { query_num: 0, query: 'C', count: 4, first_position: 12, last_position: 15, lcp: 2 },
+    ///             BisectResult { query_num: 1, query: 'T', count: 5, first_position: 23, last_position: 27, lcp: 2 }]
     ///     );
+    ///     
+    ///     // 2. with secondary prefix; searching for suffixes ACG, ACA.
+    ///     let opt_with_pfx2 = BisectOptions {
+    ///         queries: vec!['G','A'],
+    ///         max_query_len: None,
+    ///         low_memory: false,
+    ///         prefix_result: Some(res_with_pfx[0].clone()),
+    ///     };
+    ///     
+    ///     let res_with_pfx2 = sufr.bisect(opt_with_pfx2)?;
+    ///     println!("{:?}", res_with_pfx2);
+    ///     
+    ///     assert_eq!(
+    ///         res_with_pfx2,
+    ///         vec![BisectResult { query_num: 0, query: 'G', count: 1, first_position: 13, last_position: 13, lcp: 3 },
+    ///             BisectResult { query_num: 1, query: 'A', count: 0, first_position: 0, last_position: 0, lcp: 0 }]
+    ///     );
+    ///     
     ///     Ok(())
     /// }
     /// ```
