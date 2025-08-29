@@ -1,5 +1,5 @@
 # Fork Information
-This fork implements experimental changes and features for the sufr python binding [pylibsufr](https://github.com/wheelerlab/pylibsufr) motiviated by the use of sufr in the ongoing development of [MiRROR](https://github.com/wheelerlab/mirror), a computational proteomics tool for de novo peptide sequencing.
+This fork implements experimental changes and features for the sufr python binding [pylibsufr](https://github.com/traviswheelerlab/pylibsufr) motiviated by the use of sufr in the ongoing development of [MiRROR](https://github.com/traviswheelerlab/mirror), a computational proteomics tool for de novo peptide sequencing.
 Nothing is guaranteed to work, or work well, at the moment. 
 
 # Parallel Construction of Suffix Arrays in Rust
