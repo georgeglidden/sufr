@@ -189,10 +189,10 @@ where
     ) -> Result<BisectResult> {
         let query = qry as char;
         // println!("bisect:\n-qry {}-lcp {}-low {}-high {}", qry, lcp, low, high);
-        if let Some(start) = self.bisect_char_first(qry, lcp, low, high) {
+        if let Some(start) = self.bisect_char_first(qry, lcp, low, high, low) {
             // something was found
             let end = self
-                .bisect_char_last(qry, lcp, start, high, high + 1)
+                .bisect_char_last(qry, lcp, start, high, high)
                 .unwrap_or(start);
         //     println!("something was found {}..{}", start, end);
             Ok(BisectResult {
@@ -405,33 +405,37 @@ where
         lcp: usize,
         low: usize,
         high: usize,
+        min: usize,
     ) -> Option<usize> {
-        // println!("bisect_char_first\n-qry {}-lcp {}-low {}-high {}", qry, lcp, low, high);
+         // println!("bisect_char_first\n-qry {}-lcp {}-low {}-high {}-min {}", qry as char, lcp, low, high, min);
         if high >= low {
             let mid = low + ((high - low) / 2);
             let mid_val = self.get_suffix(mid)?.to_usize();
+            // println!(" comparing mid");
             let mid_cmp = self.compare_char(qry, mid_val, lcp);
 
-            let mid_minus_one = if mid > 0 {
+            let mid_minus_one = if mid > min {
+                // println!(" constructing mid_minus_one: {} {}", mid - 1, self.get_suffix(mid - 1)?);
                 self.get_suffix(mid - 1)?.to_usize()
             } else {
                 mid_val
             };
 
+            // println!(" checking comparison {:?} with mid_minus_one {}", mid_cmp, mid_minus_one);
             if mid_cmp.cmp == Ordering::Equal
-                && (mid == 0
+                && (mid == min
                     || self.compare_char(qry, mid_minus_one, lcp).cmp == Ordering::Greater)
             {
-        //         println!("\tfirst is done: mid {mid}");
+                 // println!("\tfirst is done: mid {mid}");
                 Some(mid)
             } else if mid_cmp.cmp == Ordering::Greater {
-                self.bisect_char_first(qry, lcp, mid + 1, high)
+                self.bisect_char_first(qry, lcp, mid + 1, high, min)
             } else {
                 // Ordering::Less
-                self.bisect_char_first(qry, lcp, low, mid - 1)
+                self.bisect_char_first(qry, lcp, low, mid - 1, min)
             }
         } else {
-        //     println!("\tfirst is done: no match");
+             // println!("\tfirst is done: no match");
             None
         }
     }
@@ -443,7 +447,7 @@ where
         lcp: usize,
         low: usize,
         high: usize,
-        n: usize,
+        max: usize,
     ) -> Option<usize> {
         // println!("bisect_char_last\n-qry {}-lcp {}-low {}-high {}-n {}", qry, lcp, low, high, n);
         if high >= low {
@@ -451,22 +455,22 @@ where
             let mid_val = self.get_suffix(mid)?.to_usize();
             let mid_cmp = self.compare_char(qry, mid_val, lcp);
 
-            let mid_plus_one = if mid < n - 1 {
+            let mid_plus_one = if mid < max - 1 {
                 self.get_suffix(mid + 1)?.to_usize()
             } else {
                 mid_val
             };
 
             if mid_cmp.cmp == Ordering::Equal
-                && (mid == n - 1
+                && (mid == max
                     || self.compare_char(qry, mid_plus_one, lcp).cmp == Ordering::Less)
             {
         //         println!("\tlast is done: mid {}", mid);
                 Some(mid)
             } else if mid_cmp.cmp == Ordering::Less {
-                self.bisect_char_last(qry, lcp, low, mid - 1, n)
+                self.bisect_char_last(qry, lcp, low, mid - 1, max)
             } else {
-                self.bisect_char_last(qry, lcp, mid + 1, high, n)
+                self.bisect_char_last(qry, lcp, mid + 1, high, max)
             }
         } else {
         //     println!("\tlast is done: no match");
@@ -503,14 +507,14 @@ where
                 0
             }
         };
-        // println!("compare_char\n-query {}-pos {}-loc {}", query, suffix_pos, loc);
-        // println!("-text {:?}", &self.get_text(suffix_pos + loc));
+        // println!("\tcompare_char\n\t-query {}-pos {}-loc {}", query as char, suffix_pos, loc);
         let cmp = if (max_query_len > 0) && (loc >= max_query_len) {
             // We've seen enough
             Ordering::Equal
         } else {
             // Get the next chars
             let full_offset = find_lcp_full_offset(loc, self.sort_type);
+            // println!("\t full offset {} text {:?}, max {}", full_offset, &self.get_text(suffix_pos + full_offset), self.text.len());
             match (
                 Some(query),
                 &self.get_text(suffix_pos + full_offset),
