@@ -673,62 +673,59 @@ where
     /// or if it is desirable to avoid enumerating every match,
     /// this method can be used as a faster stand-in for `count`
     /// ```
-    ///use anyhow::Result;
-    ///use libsufr::{types::{ListOptions, BisectOptions, BisectResult}, sufr_file::SufrFile};
-    ///
-    ///fn main() -> Result<()> {
-    ///    let mut sufr = SufrFile::<u32>::read("../data/inputs/3.sufr", false)?;
-    ///    
-    ///    // 1. without prefix result; should search the whole array for suffixes beginning with A.
-    ///    let opt_sans_pfx = BisectOptions {
-    ///        queries: vec!['A'],
-    ///        max_query_len: None,
-    ///        low_memory: false,
-    ///        prefix_result: None
-    ///    };
-    ///    
-    ///    let res_sans_pfx = sufr.bisect(opt_sans_pfx)?;
-    ///    println!("{:?}", res_sans_pfx);
-    ///    assert_eq!(
-    ///        res_sans_pfx,
-    ///        vec![BisectResult { query_num: 0, query: 'A', count: 27, first_position: 1, last_position: 27, lcp: 1 }]
-    ///    );
-    ///    
-    ///    // 1. with prefix; recursively, we are searching for suffixes AC and AT.
-    ///    let opt_with_pfx = BisectOptions {
-    ///        queries: vec!['C','T'],
-    ///        max_query_len: None,
-    ///        low_memory: false,
-    ///        prefix_result: Some(res_sans_pfx[0].clone()),
-    ///    };
-    ///    
-    ///    let res_with_pfx = sufr.bisect(opt_with_pfx)?;
-    ///    println!("{:?}", res_with_pfx);
-    ///    
-    ///    assert_eq!(
-    ///        res_with_pfx,
-    ///        vec![BisectResult { query_num: 0, query: 'C', count: 4, first_position: 12, last_position: 15, lcp: 2 },
-    ///            BisectResult { query_num: 1, query: 'T', count: 5, first_position: 23, last_position: 27, lcp: 2 }]
-    ///    );
-    ///    
-    ///    // 2. with secondary prefix; searching for suffixes ACG, ACA.
-    ///    let opt_with_pfx2 = BisectOptions {
-    ///        queries: vec!['G','A'],
-    ///        max_query_len: None,
-    ///        low_memory: false,
-    ///        prefix_result: Some(res_with_pfx[0].clone()),
-    ///    };
-    ///    
-    ///    let res_with_pfx2 = sufr.bisect(opt_with_pfx2)?;
-    ///    println!("{:?}", res_with_pfx2);
-    ///    
-    ///    assert_eq!(
-    ///        res_with_pfx2,
-    ///        vec![BisectResult { query_num: 0, query: 'G', count: 1, first_position: 13, last_position: 13, lcp: 3 },
-    ///            BisectResult { query_num: 1, query: 'A', count: 0, first_position: 0, last_position: 0, lcp: 0 }]
-    ///    );
-    ///    
-    ///    Ok(())
+    /// use anyhow::Result;
+    /// use libsufr::{types::{CountOptions, CountResult, BisectOptions, BisectResult}, sufr_file::SufrFile};
+    /// 
+    /// fn main() -> Result<()> {
+    ///     let K = 5;
+    ///     let alphabet = vec!['A','C','G','N','T'];
+    ///     let mut sufr = SufrFile::<u32>::read("../data/inputs/3.sufr", false)?;
+    ///     let mut seqs: Vec<String> = vec!["".to_owned()];
+    ///     let mut bisect_res: Vec<Option<BisectResult>> = vec![None];
+    ///     println!("scanning kmers for k=1..{}", K);
+    ///     let mut all_equal = true;
+    ///     for k in 1..(K+1) {
+    ///         println!("k={}", k);
+    ///         let mut new_seqs: Vec<String> = Vec::new();
+    ///         let mut new_bisect_res: Vec<Option<BisectResult>> = Vec::new();
+    ///         for (seq,res) in seqs.iter().zip(bisect_res.iter()) {
+    ///             for chr in alphabet.iter() {
+    ///                 let new_seq = seq.clone() + &chr.to_string();
+    ///                 
+    ///                 let opt = BisectOptions {
+    ///                     queries: vec![*chr],
+    ///                     max_query_len: None,
+    ///                     low_memory: false,
+    ///                     prefix_result: res.clone(),
+    ///                 };
+    ///                 let new_res = sufr.bisect(opt)?[0].clone();
+    ///                 let bisect_count = new_res.count;
+    ///                 let bisect_range = (new_res.first_position, new_res.last_position);
+    ///                 let copt = CountOptions {
+    ///                     queries: vec![new_seq.clone()],
+    ///                     max_query_len: None,
+    ///                     low_memory: false,
+    ///                 };
+    ///                 let true_count = sufr.count(copt)?[0].count;
+    ///                 
+    ///                 if bisect_count != true_count {
+    ///                     let prefix_range = match(res) {
+    ///                         Some(x) => (x.first_position, x.last_position),
+    ///                         None => (0,0),
+    ///                     };
+    ///                     println!("{:?} {} != {} ranges= {:?}, {:?}", new_seq.clone(), bisect_count, true_count, bisect_range, prefix_range);
+    ///                     assert!(false);
+    ///                     all_equal = false;
+    ///                 };
+    ///                 new_seqs.push(new_seq.clone());
+    ///                 new_bisect_res.push(Some(new_res));
+    ///             }
+    ///         }
+    ///         seqs = new_seqs;
+    ///         bisect_res = new_bisect_res;
+    ///     }
+    ///     assert!(all_equal);
+    ///     Ok(())
     ///}
     /// ```
     pub fn bisect(&mut self, args: BisectOptions) -> Result<Vec<BisectResult>> {
